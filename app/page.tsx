@@ -23,17 +23,23 @@ export default function Home() {
   const [seriesInstance, setSeriesInstance] = useState<any>(null);
   const [telegramId, setTelegramId] = useState<number>(123456789);
 
-    useEffect(() => {
-    // Временно используем тестовый ID
-    setTelegramId(123456789);
-    fetch(`/api/user/balance?telegramId=123456789`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.balance !== undefined) setBalance(data.balance);
-        if (data.uid !== undefined) setUserUid(data.uid);
-      })
-      .catch(console.error);
-  }, []);
+  // 1. ПОЛУЧАЕМ ID И UID (С ОТЛАДКОЙ)
+  useEffect(() => {
+    let currentId = 123456789;
+    if (typeof window !== "undefined" && (window as any).Telegram?.WebApp) {
+      const tg = (window as any).Telegram.WebApp;
+      tg.ready();
+      tg.expand();
+      if (tg.initDataUnsafe?.user?.id) {
+        currentId = tg.initDataUnsafe.user.id;
+        setTelegramId(currentId);
+      }
+    }
+
+    // Временное окно для проверки
+    setTimeout(() => {
+      alert("Ваш Telegram ID: " + currentId);
+    }, 1000);
 
     fetch(`/api/user/balance?telegramId=${currentId}`)
       .then((res) => res.json())
@@ -168,7 +174,7 @@ export default function Home() {
 
   return (
     <div className="h-screen flex flex-col bg-[#0B0E11] overflow-hidden relative">
-      {/* УПРОЩЕННЫЙ ПРОФИЛЬ */}
+      {/* УПРОЩЕННЫЙ ПРОФИЛЬ (МОДАЛЬНОЕ ОКНО) */}
       {showProfile && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.9)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <div style={{ backgroundColor: '#151A21', padding: '20px', borderRadius: '16px', width: '80%', maxWidth: '300px', textAlign: 'center', border: '1px solid #1f2630' }}>
@@ -183,7 +189,7 @@ export default function Home() {
       {/* ВЕРХНЯЯ ПАНЕЛЬ */}
       <header className="flex justify-between items-center px-4 py-3 bg-[#0B0E11] shrink-0 relative z-30">
         <div className="flex items-center gap-3">
-          <button onClick={() => { console.log("Клик по аватарке!"); setShowProfile(true); }} className="w-10 h-10 bg-[#00C076] rounded-full flex items-center justify-center font-bold text-white text-lg shadow-[0_0_10px_rgba(0,192,118,0.3)]">
+          <button onClick={() => setShowProfile(true)} className="w-10 h-10 bg-[#00C076] rounded-full flex items-center justify-center font-bold text-white text-lg shadow-[0_0_10px_rgba(0,192,118,0.3)]">
             P
           </button>
           <div className="flex flex-col">
@@ -211,7 +217,7 @@ export default function Home() {
         </div>
       </header>
 
-      {/* ОСТАЛЬНОЙ ИНТЕРФЕЙС (ГРАФИК И КНОПКИ) */}
+      {/* ИНФО О ПАРЕ И ТАЙМФРЕЙМЫ */}
       <div className="flex flex-col px-4 py-1 shrink-0 relative z-20">
         <div className="flex justify-between items-center text-xs mb-2">
           <div className="flex items-center gap-2 font-bold cursor-pointer" onClick={() => setShowAssets(!showAssets)}>
@@ -228,11 +234,30 @@ export default function Home() {
         </div>
       </div>
 
+      {/* ВЫПАДАЮЩИЙ СПИСОК АКТИВОВ */}
+      {showAssets && (
+        <div className="absolute top-[110px] left-4 w-64 bg-[#151A21] rounded-xl shadow-2xl z-50 border border-[#1f2630] overflow-hidden">
+           <div className="p-2 border-b border-[#1f2630] flex items-center gap-2 text-gray-400">
+              <Search size={14} />
+              <input type="text" placeholder="Поиск..." className="bg-transparent text-sm outline-none w-full text-white" />
+           </div>
+           <div className="max-h-60 overflow-y-auto">
+              {ASSETS.map((asset) => (
+                <div key={asset} onClick={() => { setSelectedAsset(asset); setShowAssets(false); }} className={`px-4 py-3 text-sm font-bold cursor-pointer hover:bg-[#1f2630] ${selectedAsset === asset ? "text-[#00C076]" : "text-white"}`}>
+                  {asset}
+                </div>
+              ))}
+           </div>
+        </div>
+      )}
+
+      {/* ТЕКУЩАЯ ЦЕНА И ГРАФИК */}
       <div className="flex-1 relative min-h-[300px]">
         <div className="absolute top-2 left-4 z-10"><span className="text-3xl font-bold text-white">${price}</span></div>
         <div className="w-full h-full" ref={chartContainerRef} />
       </div>
 
+      {/* ПАНЕЛЬ СТАВКИ */}
       <div className="p-3 bg-[#0B0E11] shrink-0 relative z-20">
         <div className="grid grid-cols-3 gap-2 mb-3 items-stretch">
            <div className="bg-[#151A21] rounded-xl flex flex-col items-center justify-center h-[80px]"><Clock size={16} className="text-gray-400 mb-1" /><span className="font-bold text-sm text-white">{expiry}</span></div>
@@ -251,6 +276,7 @@ export default function Home() {
         </div>
       </div>
 
+      {/* НИЖНЕЕ МЕНЮ */}
       <div className="flex justify-around items-center py-2 border-t border-[#151A21] bg-[#0B0E11] shrink-0">
          <button className="flex flex-col items-center gap-0.5 text-gray-400"><Menu size={18} /><span className="text-[9px]">Меню</span></button>
          <button className="flex flex-col items-center gap-0.5 text-[#00C076]"><CandlestickChart size={20} /><span className="text-[9px]">Торговля</span></button>
