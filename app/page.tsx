@@ -23,18 +23,17 @@ export default function Home() {
   const [seriesInstance, setSeriesInstance] = useState<any>(null);
   const [telegramId, setTelegramId] = useState<number>(123456789);
 
-  // 1. ПОЛУЧАЕМ ID И UID
-  useEffect(() => {
-    let currentId = 123456789;
-    if (typeof window !== "undefined" && (window as any).Telegram?.WebApp) {
-      const tg = (window as any).Telegram.WebApp;
-      tg.ready();
-      tg.expand();
-      if (tg.initDataUnsafe?.user?.id) {
-        currentId = tg.initDataUnsafe.user.id;
-        setTelegramId(currentId);
-      }
-    }
+    useEffect(() => {
+    // Временно используем тестовый ID
+    setTelegramId(123456789);
+    fetch(`/api/user/balance?telegramId=123456789`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.balance !== undefined) setBalance(data.balance);
+        if (data.uid !== undefined) setUserUid(data.uid);
+      })
+      .catch(console.error);
+  }, []);
 
     fetch(`/api/user/balance?telegramId=${currentId}`)
       .then((res) => res.json())
