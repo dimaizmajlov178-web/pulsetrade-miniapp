@@ -23,35 +23,44 @@ export default function Home() {
   const [seriesInstance, setSeriesInstance] = useState<any>(null);
   const [telegramId, setTelegramId] = useState<number>(123456789);
 
-  // 1. ПРИНУДИТЕЛЬНАЯ ПЕРЕЗАГРУЗКА, ЕСЛИ TELEGRAM НЕ ЗАГРУЗИЛСЯ
+  // 1. ПОЛУЧАЕМ ID ИЗ URL ИЛИ СКРИПТА
   useEffect(() => {
-    // Если мы уже перезагружались в этой сессии, не делаем это снова
-    const hasReloaded = sessionStorage.getItem("tg_reloaded");
-    
-    if (!hasReloaded) {
-      // Проверяем, есть ли Telegram
-      if (typeof window !== "undefined" && !(window as any).Telegram?.WebApp) {
-        // Если нет — ставим флаг и перезагружаем страницу через 500мс (даем скрипту шанс)
-        sessionStorage.setItem("tg_reloaded", "true");
-        setTimeout(() => {
-          window.location.reload();
-        }, 500);
-        return;
-      }
-    }
-
-    // Если Telegram есть или мы уже перезагружались — загружаем данные
     let currentId = 123456789;
+
+    // Способ 1: Пытаемся получить из скрипта Telegram
     if (typeof window !== "undefined" && (window as any).Telegram?.WebApp) {
       const tg = (window as any).Telegram.WebApp;
       tg.ready();
       tg.expand();
       if (tg.initDataUnsafe?.user?.id) {
         currentId = tg.initDataUnsafe.user.id;
-        setTelegramId(currentId);
       }
     }
 
+    // Способ 2: Если скрипт не сработал, пробуем вытащить ID из URL (hash)
+    if (currentId === 123456789 && typeof window !== "undefined") {
+      const hash = window.location.hash;
+      if (hash) {
+        // Telegram передает данные в формате: #tgWebAppData=query_id%3D...%26user%3D%7B%22id%22%3A12345%7D
+        const urlParams = new URLSearchParams(hash.replace("#", "?"));
+        const tgWebAppData = urlParams.get("tgWebAppData");
+        if (tgWebAppData) {
+          try {
+            const decoded = decodeURIComponent(tgWebAppData);
+            const match = decoded.match(/"id":(\d+)/);
+            if (match && match[1]) {
+              currentId = Number(match[1]);
+            }
+          } catch (e) {
+            console.error("Ошибка парсинга URL:", e);
+          }
+        }
+      }
+    }
+
+    setTelegramId(currentId);
+
+    // Загружаем баланс
     fetch(`/api/user/balance?telegramId=${currentId}`)
       .then((res) => res.json())
       .then((data) => {
