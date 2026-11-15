@@ -16,9 +16,21 @@ export default function Home() {
   const [timeframe, setTimeframe] = useState("1m");
   const [selectedAsset, setSelectedAsset] = useState("BTC/USDT");
   const [showAssets, setShowAssets] = useState(false);
-  const [showBalanceMenu, setShowBalanceMenu] = useState(false); // Состояние для меню баланса
+  const [showBalanceMenu, setShowBalanceMenu] = useState(false);
   const [chartInstance, setChartInstance] = useState<any>(null);
   const [seriesInstance, setSeriesInstance] = useState<any>(null);
+
+  // 1. ЗАГРУЖАЕМ АКТУАЛЬНЫЙ БАЛАНС ПРИ СТАРТЕ
+  useEffect(() => {
+    fetch("/api/user/balance")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.balance !== undefined) {
+          setBalance(data.balance);
+        }
+      })
+      .catch(console.error);
+  }, []);
 
   const getSymbol = () => selectedAsset.replace("/", "");
 
@@ -158,7 +170,6 @@ export default function Home() {
         </div>
         
         <div className="flex items-center gap-3 relative">
-          {/* АКТИВНАЯ ПЛАШКА БАЛАНСА */}
           <button 
             onClick={() => setShowBalanceMenu(!showBalanceMenu)}
             className="bg-[#151A21] px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold text-[#00C076] hover:bg-[#1f2630] transition-colors"
@@ -167,27 +178,19 @@ export default function Home() {
             ${balance}
           </button>
 
-          {/* ВЫПАДАЮЩЕЕ МЕНЮ БАЛАНСА */}
           {showBalanceMenu && (
             <div className="absolute top-[50px] right-[40px] w-48 bg-[#151A21] rounded-xl shadow-2xl border border-[#1f2630] overflow-hidden z-50 flex flex-col">
-               <button 
-                  className="flex items-center gap-3 px-4 py-3 text-sm font-bold text-white hover:bg-[#1f2630] transition-colors"
-                  onClick={() => setShowBalanceMenu(false)}
-               >
+               <button className="flex items-center gap-3 px-4 py-3 text-sm font-bold text-white hover:bg-[#1f2630] transition-colors" onClick={() => setShowBalanceMenu(false)}>
                   <PlusCircle size={16} className="text-[#00C076]" />
                   Пополнить
                </button>
                <div className="h-[1px] bg-[#1f2630] w-full"></div>
-               <button 
-                  className="flex items-center gap-3 px-4 py-3 text-sm font-bold text-white hover:bg-[#1f2630] transition-colors"
-                  onClick={() => setShowBalanceMenu(false)}
-               >
+               <button className="flex items-center gap-3 px-4 py-3 text-sm font-bold text-white hover:bg-[#1f2630] transition-colors" onClick={() => setShowBalanceMenu(false)}>
                   <ArrowUpRight size={16} className="text-[#FF4D4D]" />
                   Вывести
                </button>
             </div>
           )}
-
           <button className="text-white"><Menu size={24} /></button>
         </div>
       </header>
@@ -195,10 +198,7 @@ export default function Home() {
       {/* ИНФО О ПАРЕ И ТАЙМФРЕЙМЫ */}
       <div className="flex flex-col px-4 py-1 shrink-0 relative z-20">
         <div className="flex justify-between items-center text-xs mb-2">
-          <div 
-            className="flex items-center gap-2 font-bold cursor-pointer hover:bg-[#151A21] px-2 py-1 rounded-lg transition-colors -ml-2"
-            onClick={() => setShowAssets(!showAssets)}
-          >
+          <div className="flex items-center gap-2 font-bold cursor-pointer hover:bg-[#151A21] px-2 py-1 rounded-lg transition-colors -ml-2" onClick={() => setShowAssets(!showAssets)}>
             <span className="text-base text-white">{selectedAsset}</span>
             <ChevronDown size={16} className={`text-gray-400 transition-transform ${showAssets ? 'rotate-180' : ''}`} />
             <span className="text-[#00C076] ml-2">82%</span>
@@ -208,13 +208,7 @@ export default function Home() {
         
         <div className="flex gap-4 overflow-x-auto text-xs font-bold pb-1">
           {TIMEFRAMES.map((tf) => (
-            <button
-              key={tf}
-              onClick={() => setTimeframe(tf)}
-              className={`transition-colors ${
-                timeframe === tf ? "text-[#00C076]" : "text-gray-500 hover:text-gray-300"
-              }`}
-            >
+            <button key={tf} onClick={() => setTimeframe(tf)} className={`transition-colors ${timeframe === tf ? "text-[#00C076]" : "text-gray-500 hover:text-gray-300"}`}>
               {tf}
             </button>
           ))}
@@ -230,16 +224,7 @@ export default function Home() {
            </div>
            <div className="max-h-60 overflow-y-auto">
               {ASSETS.map((asset) => (
-                <div 
-                  key={asset}
-                  onClick={() => {
-                    setSelectedAsset(asset);
-                    setShowAssets(false);
-                  }}
-                  className={`px-4 py-3 text-sm font-bold cursor-pointer hover:bg-[#1f2630] transition-colors ${
-                    selectedAsset === asset ? "text-[#00C076]" : "text-white"
-                  }`}
-                >
+                <div key={asset} onClick={() => { setSelectedAsset(asset); setShowAssets(false); }} className={`px-4 py-3 text-sm font-bold cursor-pointer hover:bg-[#1f2630] transition-colors ${selectedAsset === asset ? "text-[#00C076]" : "text-white"}`}>
                   {asset}
                 </div>
               ))}
@@ -257,9 +242,7 @@ export default function Home() {
 
       {/* ПАНЕЛЬ СТАВКИ */}
       <div className="p-3 bg-[#0B0E11] shrink-0 relative z-20">
-        
         <div className="grid grid-cols-3 gap-2 mb-3 items-stretch">
-           
            <div className="bg-[#151A21] rounded-xl flex flex-col items-center justify-center h-[80px]">
               <Clock size={16} className="text-gray-400 mb-1" />
               <div className="flex items-center gap-1">
@@ -273,7 +256,6 @@ export default function Home() {
                  <span className="font-bold text-sm text-white">${amount}</span>
                  <ChevronDown size={12} className="text-gray-400" />
               </div>
-              
               <div className="flex gap-1 h-8 mt-1">
                  <button onClick={() => setAmount(Math.max(1, Math.floor(amount / 2)))} className="flex-1 bg-[#151A21] rounded-lg flex justify-center items-center text-white text-xs font-bold hover:bg-[#1f2630] transition">/2</button>
                  <button onClick={() => setAmount(amount * 2)} className="flex-1 bg-[#151A21] rounded-lg flex justify-center items-center text-white text-xs font-bold hover:bg-[#1f2630] transition">x2</button>
@@ -290,16 +272,10 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-2 gap-3 h-20">
-          <button
-            onClick={() => handleTrade("up")}
-            className="bg-[#00C076] rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(0,192,118,0.3)]"
-          >
+          <button onClick={() => handleTrade("up")} className="bg-[#00C076] rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(0,192,118,0.3)]">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
           </button>
-          <button
-            onClick={() => handleTrade("down")}
-            className="bg-[#FF4D4D] rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(255,77,77,0.3)]"
-          >
+          <button onClick={() => handleTrade("down")} className="bg-[#FF4D4D] rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(255,77,77,0.3)]">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
           </button>
         </div>
