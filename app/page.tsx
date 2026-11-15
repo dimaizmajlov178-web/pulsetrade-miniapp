@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createChart, ColorType } from "lightweight-charts";
-import { ChevronDown, Menu, Wallet, Settings, Clock, CandlestickChart, Search, PlusCircle, ArrowUpRight } from "lucide-react";
+import { ChevronDown, Menu, Wallet, Settings, Clock, CandlestickChart, Search, PlusCircle, ArrowUpRight, X } from "lucide-react";
 
 const TIMEFRAMES = ["1m", "3m", "5m", "15m", "30m", "1h", "4h"];
 const ASSETS = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT", "DOGE/USDT"];
@@ -17,15 +17,15 @@ export default function Home() {
   const [selectedAsset, setSelectedAsset] = useState("BTC/USDT");
   const [showAssets, setShowAssets] = useState(false);
   const [showBalanceMenu, setShowBalanceMenu] = useState(false);
+  const [showProfile, setShowProfile] = useState(false); // Состояние для профиля
+  const [userUid, setUserUid] = useState<number | null>(null); // Состояние для UID
   const [chartInstance, setChartInstance] = useState<any>(null);
   const [seriesInstance, setSeriesInstance] = useState<any>(null);
   
-  // Состояние для хранения реального Telegram ID
   const [telegramId, setTelegramId] = useState<number>(123456789);
 
-  // 1. ПОЛУЧАЕМ РЕАЛЬНЫЙ TELEGRAM ID И ЗАГРУЖАЕМ БАЛАНС
+  // 1. ПОЛУЧАЕМ ID, БАЛАНС И UID
   useEffect(() => {
-    // Получаем ID из Telegram
     let currentId = 123456789;
     if (typeof window !== "undefined" && (window as any).Telegram?.WebApp) {
       const tg = (window as any).Telegram.WebApp;
@@ -34,19 +34,29 @@ export default function Home() {
       if (tg.initDataUnsafe?.user?.id) {
         currentId = tg.initDataUnsafe.user.id;
         setTelegramId(currentId);
-        console.log("Реальный Telegram ID:", currentId);
       }
     }
 
-    // Загружаем баланс для этого ID
     fetch(`/api/user/balance?telegramId=${currentId}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.balance !== undefined) {
           setBalance(data.balance);
         }
+        if (data.uid !== undefined) {
+          setUserUid(data.uid);
+        }
       })
       .catch(console.error);
+  }, []);
+
+  // 2. БУДИЛЬНИК ДЛЯ ЗАКРЫТИЯ СДЕЛОК
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetch("/api/cron").catch(console.error);
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const getSymbol = () => selectedAsset.replace("/", "");
@@ -155,7 +165,7 @@ export default function Home() {
           symbol: getSymbol(),
           direction: direction,
           amount: amount,
-          telegramId: telegramId, // Отправляем реальный ID
+          telegramId: telegramId,
         }),
       });
 
@@ -173,9 +183,13 @@ export default function Home() {
       {/* ВЕРХНЯЯ ПАНЕЛЬ */}
       <header className="flex justify-between items-center px-4 py-3 bg-[#0B0E11] shrink-0 relative z-30">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-[#00C076] rounded-full flex items-center justify-center font-bold text-white text-lg shadow-[0_0_10px_rgba(0,192,118,0.3)]">
+          {/* КЛИКАБЕЛЬНАЯ АВАТАРКА */}
+          <button 
+            onClick={() => setShowProfile(true)}
+            className="w-10 h-10 bg-[#00C076] rounded-full flex items-center justify-center font-bold text-white text-lg shadow-[0_0_10px_rgba(0,192,118,0.3)] hover:opacity-90 transition"
+          >
             P
-          </div>
+          </button>
           <div className="flex flex-col">
             <span className="text-[#00C076] font-bold text-sm leading-tight">PULSETRADE</span>
             <div className="flex items-center gap-1 text-[10px] text-gray-400">
@@ -211,6 +225,36 @@ export default function Home() {
           <button className="text-white"><Menu size={24} /></button>
         </div>
       </header>
+
+      {/* МОДАЛЬНОЕ ОКНО ПРОФИЛЯ */}
+      {showProfile && (
+        <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#151A21] w-full max-w-sm rounded-2xl p-6 relative border border-[#1f2630]">
+            <button 
+              onClick={() => setShowProfile(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white"
+            >
+              <X size={20} />
+            </button>
+            <div className="flex flex-col items-center">
+              <div className="w-20 h-20 bg-[#00C076] rounded-full flex items-center justify-center font-bold text-white text-3xl mb-4 shadow-[0_0_20px_rgba(0,192,118,0.4)]">
+                P
+              </div>
+              <h2 className="text-xl font-bold text-white mb-1">Ваш Профиль</h2>
+              <div className="bg-[#0B0E11] w-full rounded-xl p-4 mt-4 flex flex-col gap-3 border border-[#1f2630]">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-400">Ваш UID:</span>
+                  <span className="text-[#00C076] font-mono font-bold text-lg">{userUid || "Загрузка..."}</span>
+                </div>
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-gray-400">Текущий баланс:</span>
+                  <span className="text-white font-bold">${balance}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ИНФО О ПАРЕ И ТАЙМФРЕЙМЫ */}
       <div className="flex flex-col px-4 py-1 shrink-0 relative z-20">
