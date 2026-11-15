@@ -24,41 +24,78 @@ export default function Home() {
   const [telegramId, setTelegramId] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // 1. ПОЛУЧАЕМ ID С ОЖИДАНИЕМ
+  // 1. ПОЛУЧАЕМ ID ИЗ СКРИПТА ИЛИ URL
   useEffect(() => {
-    let attempts = 0;
-    const maxAttempts = 15; // 15 * 200ms = 3 секунды
+    let currentId: number | null = null;
 
-    const checkTelegram = () => {
-      if (typeof window !== "undefined" && (window as any).Telegram?.WebApp) {
-        const tg = (window as any).Telegram.WebApp;
-        tg.ready();
-        tg.expand();
-        if (tg.initDataUnsafe?.user?.id) {
-          const realId = tg.initDataUnsafe.user.id;
+    // Способ 1: Из скрипта Telegram
+    if (typeof window !== "undefined" && (window as any).Telegram?.WebApp) {
+      const tg = (window as any).Telegram.WebApp;
+      tg.ready();
+      tg.expand();
+      if (tg.initDataUnsafe?.user?.id) {
+        currentId = tg.initDataUnsafe.user.id;
+      }
+    }
+
+    // Способ 2: Из URL (если скрипт не сработал)
+    if (!currentId && typeof window !== "undefined") {
+      try {
+        const hash = window.location.hash;
+        if (hash && hash.includes("tgWebAppData")) {
+          const urlParams = new URLSearchParams(hash.replace("#", "?"));
+          const tgWebAppData = urlParams.get("tgWebAppData");
+          if (tgWebAppData) {
+            const decoded = decodeURIComponent(tgWebAppData);
+            const match = decoded.match(/"id":(\d+)/);
+            if (match && match[1]) {
+              currentId = Number(match[1]);
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Ошибка парсинга URL:", e);
+      }
+    }
+
+    if (currentId) {
+      setTelegramId(currentId);
+      fetch(`/api/user/balance?telegramId=${currentId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.balance !== undefined) setBalance(data.balance);
+          if (data.uid !== undefined) setUserUid(data.uid);
+          setIsLoading(false);
+        })
+        .catch((err) => {
+          console.error(err);
+          setIsLoading(false);
+        });
+    } else {
+      // Если не нашли ID, пробуем подождать (вдруг скрипт загрузится позже)
+      let attempts = 0;
+      const checkTelegram = () => {
+        if (typeof window !== "undefined" && (window as any).Telegram?.WebApp?.initDataUnsafe?.user?.id) {
+          const realId = (window as any).Telegram.WebApp.initDataUnsafe.user.id;
           setTelegramId(realId);
-          
           fetch(`/api/user/balance?telegramId=${realId}`)
             .then((res) => res.json())
             .then((data) => {
               if (data.balance !== undefined) setBalance(data.balance);
               if (data.uid !== undefined) setUserUid(data.uid);
               setIsLoading(false);
-            })
-            .catch(console.error);
-          return;
+            });
+        } else {
+          attempts++;
+          if (attempts < 10) {
+            setTimeout(checkTelegram, 300);
+          } else {
+            setIsLoading(false);
+          }
         }
-      }
-
-      attempts++;
-      if (attempts < maxAttempts) {
-        setTimeout(checkTelegram, 200);
-      } else {
-        setIsLoading(false); // Прекращаем ждать, показываем экран с кнопкой
-      }
-    };
-
-    checkTelegram();
+      };
+      checkTelegram();
+    }
   }, []);
 
   // 2. ЗАКРЫТИЕ СДЕЛОК
@@ -161,7 +198,7 @@ export default function Home() {
 
   const handleTrade = async (direction: string) => {
     if (!telegramId) {
-      alert("Telegram не загружен. Нажмите кнопку 'Обновить'.");
+      alert("Ошибка: Telegram ID не загружен. Обновите страницу.");
       return;
     }
     if (balance < amount) {
@@ -187,7 +224,7 @@ export default function Home() {
     }
   };
 
-  // ЭКРАН ЗАГРУЗКИ ИЛИ ОШИБКИ
+  // ЭКРАН ЗАГРУЗКИ
   if (isLoading || !telegramId) {
     return (
       <div className="h-screen flex flex-col items-center justify-center bg-[#0B0E11] text-white p-4">
