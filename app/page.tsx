@@ -23,28 +23,33 @@ export default function Home() {
   const [seriesInstance, setSeriesInstance] = useState<any>(null);
   const [telegramId, setTelegramId] = useState<number>(123456789);
 
-  // 1. ПОЛУЧАЕМ ID И UID (С ОТЛАДКОЙ)
+  // 1. ПОЛУЧАЕМ ID И UID (С ОЖИДАНИЕМ ЗАГРУЗКИ СКРИПТА)
   useEffect(() => {
-    let currentId = 123456789;
-    if (typeof window !== "undefined" && (window as any).Telegram?.WebApp) {
-      const tg = (window as any).Telegram.WebApp;
-      tg.ready();
-      tg.expand();
-      if (tg.initDataUnsafe?.user?.id) {
-        currentId = tg.initDataUnsafe.user.id;
-        setTelegramId(currentId);
+    const initApp = () => {
+      let currentId = 123456789;
+      if (typeof window !== "undefined" && (window as any).Telegram?.WebApp) {
+        const tg = (window as any).Telegram.WebApp;
+        tg.ready();
+        tg.expand();
+        if (tg.initDataUnsafe?.user?.id) {
+          currentId = tg.initDataUnsafe.user.id;
+          setTelegramId(currentId);
+        }
       }
-    }
 
-  
+      // Загружаем баланс
+      fetch(`/api/user/balance?telegramId=${currentId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.balance !== undefined) setBalance(data.balance);
+          if (data.uid !== undefined) setUserUid(data.uid);
+        })
+        .catch(console.error);
+    };
 
-    fetch(`/api/user/balance?telegramId=${currentId}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.balance !== undefined) setBalance(data.balance);
-        if (data.uid !== undefined) setUserUid(data.uid);
-      })
-      .catch(console.error);
+    // Ждем 1 секунду, чтобы скрипт Telegram успел загрузиться
+    const timer = setTimeout(initApp, 1000);
+    return () => clearTimeout(timer);
   }, []);
 
   // 2. ЗАКРЫТИЕ СДЕЛОК
