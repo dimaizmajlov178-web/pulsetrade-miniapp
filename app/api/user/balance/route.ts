@@ -5,13 +5,12 @@ export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   try {
-    // Пока используем тестовый ID (потом заменим на реальный из Telegram)
-    const telegramId = 123456789; 
+    const { searchParams } = new URL(request.url);
+    const telegramId = Number(searchParams.get("telegramId")) || 123456789;
 
     let userRes = await query("SELECT * FROM users WHERE telegram_id = $1", [telegramId]);
     let user = userRes.rows[0];
 
-    // Если пользователя нет — создаем
     if (!user) {
       const maxUid = await query("SELECT COALESCE(MAX(uid), 624838) as max_uid FROM users");
       const nextUid = Number(maxUid.rows[0].max_uid) + 1;

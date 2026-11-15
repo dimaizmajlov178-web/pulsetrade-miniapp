@@ -14,7 +14,7 @@ export default function RootLayout({
   return (
     <html lang="ru">
       <head>
-        {/* Обычный тег script, который загрузится до отрисовки страницы */}
+        {/* Подключаем официальный скрипт Telegram */}
         <script src="https://telegram.org/js/telegram-web-app.js" async></script>
       </head>
       <body className="bg-black text-white flex justify-center">

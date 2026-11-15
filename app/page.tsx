@@ -19,10 +19,27 @@ export default function Home() {
   const [showBalanceMenu, setShowBalanceMenu] = useState(false);
   const [chartInstance, setChartInstance] = useState<any>(null);
   const [seriesInstance, setSeriesInstance] = useState<any>(null);
+  
+  // Состояние для хранения реального Telegram ID
+  const [telegramId, setTelegramId] = useState<number>(123456789);
 
-  // 1. ЗАГРУЖАЕМ АКТУАЛЬНЫЙ БАЛАНС ПРИ СТАРТЕ
+  // 1. ПОЛУЧАЕМ РЕАЛЬНЫЙ TELEGRAM ID И ЗАГРУЖАЕМ БАЛАНС
   useEffect(() => {
-    fetch("/api/user/balance")
+    // Получаем ID из Telegram
+    let currentId = 123456789;
+    if (typeof window !== "undefined" && (window as any).Telegram?.WebApp) {
+      const tg = (window as any).Telegram.WebApp;
+      tg.ready();
+      tg.expand();
+      if (tg.initDataUnsafe?.user?.id) {
+        currentId = tg.initDataUnsafe.user.id;
+        setTelegramId(currentId);
+        console.log("Реальный Telegram ID:", currentId);
+      }
+    }
+
+    // Загружаем баланс для этого ID
+    fetch(`/api/user/balance?telegramId=${currentId}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.balance !== undefined) {
@@ -138,7 +155,7 @@ export default function Home() {
           symbol: getSymbol(),
           direction: direction,
           amount: amount,
-          telegramId: 123456789,
+          telegramId: telegramId, // Отправляем реальный ID
         }),
       });
 
