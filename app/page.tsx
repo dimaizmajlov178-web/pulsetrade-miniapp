@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createChart, ColorType } from "lightweight-charts";
-import { ChevronDown, Menu, Wallet, Settings, Clock, CandlestickChart, Search, PlusCircle, ArrowUpRight, X, RefreshCw } from "lucide-react";
+import { ChevronDown, Menu, Wallet, Settings, Clock, CandlestickChart, Search, PlusCircle, ArrowUpRight, X } from "lucide-react";
 
 const TIMEFRAMES = ["1m", "3m", "5m", "15m", "30m", "1h", "4h"];
 const ASSETS = ["BTC/USDT", "ETH/USDT", "SOL/USDT", "BNB/USDT", "XRP/USDT", "DOGE/USDT"];
@@ -21,14 +21,23 @@ export default function Home() {
   const [userUid, setUserUid] = useState<number | null>(null);
   const [chartInstance, setChartInstance] = useState<any>(null);
   const [seriesInstance, setSeriesInstance] = useState<any>(null);
-  const [telegramId, setTelegramId] = useState<number | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [telegramId, setTelegramId] = useState<number>(123456789);
 
-  // 1. ПОЛУЧАЕМ ID И UID (УМНОЕ ОЖИДАНИЕ)
+  // 1. ИНИЦИАЛИЗАЦИЯ (СНАЧАЛА ТЕСТОВЫЙ ID, ПОТОМ РЕАЛЬНЫЙ)
   useEffect(() => {
-    let attempts = 0;
-    const maxAttempts = 20;
+    // Загружаем баланс для тестового ID сразу (чтобы не было пустого экрана)
+    fetch(`/api/user/balance?telegramId=123456789`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.balance !== undefined) setBalance(data.balance);
+        if (data.uid !== undefined) setUserUid(data.uid);
+      })
+      .catch(console.error);
 
+    // Пытаемся получить реальный ID в фоне
+    let attempts = 0;
+    const maxAttempts = 10;
+    
     const checkTelegram = () => {
       if (typeof window !== "undefined" && (window as any).Telegram?.WebApp) {
         const tg = (window as any).Telegram.WebApp;
@@ -38,24 +47,21 @@ export default function Home() {
           const realId = tg.initDataUnsafe.user.id;
           setTelegramId(realId);
           
+          // Обновляем данные на реальные
           fetch(`/api/user/balance?telegramId=${realId}`)
             .then((res) => res.json())
             .then((data) => {
               if (data.balance !== undefined) setBalance(data.balance);
               if (data.uid !== undefined) setUserUid(data.uid);
-              setIsLoading(false);
             })
             .catch(console.error);
-          return;
+          return; // Успех
         }
       }
 
       attempts++;
       if (attempts < maxAttempts) {
-        setTimeout(checkTelegram, 200);
-      } else {
-        // Если не дождались, оставляем загрузку (покажем кнопку обновить)
-        setIsLoading(false);
+        setTimeout(checkTelegram, 300);
       }
     };
 
@@ -161,10 +167,6 @@ export default function Home() {
   }, [timeframe, seriesInstance, chartInstance, selectedAsset]);
 
   const handleTrade = async (direction: string) => {
-    if (!telegramId) {
-      alert("Ошибка: Telegram ID не загружен. Обновите страницу.");
-      return;
-    }
     if (balance < amount) {
       alert("Недостаточно средств");
       return;
@@ -187,22 +189,6 @@ export default function Home() {
       alert(error.message);
     }
   };
-
-  // ЭКРАН ЗАГРУЗКИ (если Telegram ID не получен)
-  if (isLoading || !telegramId) {
-    return (
-      <div className="h-screen flex flex-col items-center justify-center bg-[#0B0E11] text-white p-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00C076] mb-4"></div>
-        <p className="text-center mb-4">Загрузка Telegram...</p>
-        <button 
-          onClick={() => window.location.reload()}
-          className="bg-[#151A21] text-[#00C076] px-6 py-2 rounded-xl flex items-center gap-2 border border-[#1f2630]"
-        >
-          <RefreshCw size={16} /> Обновить
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div className="h-screen flex flex-col bg-[#0B0E11] overflow-hidden relative">
