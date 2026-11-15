@@ -23,33 +23,49 @@ export default function Home() {
   const [seriesInstance, setSeriesInstance] = useState<any>(null);
   const [telegramId, setTelegramId] = useState<number>(123456789);
 
-  // 1. ПОЛУЧАЕМ ID И UID (С ОЖИДАНИЕМ ЗАГРУЗКИ СКРИПТА)
+  // 1. ПОЛУЧАЕМ ID И UID (УМНОЕ ОЖИДАНИЕ)
   useEffect(() => {
-    const initApp = () => {
-      let currentId = 123456789;
+    let attempts = 0;
+    const maxAttempts = 20; // Ждем максимум 20 * 200мс = 4 секунды
+
+    const checkTelegram = () => {
       if (typeof window !== "undefined" && (window as any).Telegram?.WebApp) {
         const tg = (window as any).Telegram.WebApp;
         tg.ready();
         tg.expand();
         if (tg.initDataUnsafe?.user?.id) {
-          currentId = tg.initDataUnsafe.user.id;
-          setTelegramId(currentId);
+          const realId = tg.initDataUnsafe.user.id;
+          setTelegramId(realId);
+          
+          // Загружаем баланс с реальным ID
+          fetch(`/api/user/balance?telegramId=${realId}`)
+            .then((res) => res.json())
+            .then((data) => {
+              if (data.balance !== undefined) setBalance(data.balance);
+              if (data.uid !== undefined) setUserUid(data.uid);
+            })
+            .catch(console.error);
+          
+          return; // Успех, выходим
         }
       }
 
-      // Загружаем баланс
-      fetch(`/api/user/balance?telegramId=${currentId}`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.balance !== undefined) setBalance(data.balance);
-          if (data.uid !== undefined) setUserUid(data.uid);
-        })
-        .catch(console.error);
+      attempts++;
+      if (attempts < maxAttempts) {
+        setTimeout(checkTelegram, 200); // Пробуем снова через 200мс
+      } else {
+        // Если не дождались, грузим тестовый ID
+        fetch(`/api/user/balance?telegramId=123456789`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.balance !== undefined) setBalance(data.balance);
+            if (data.uid !== undefined) setUserUid(data.uid);
+          })
+          .catch(console.error);
+      }
     };
 
-    // Ждем 1 секунду, чтобы скрипт Telegram успел загрузиться
-    const timer = setTimeout(initApp, 1000);
-    return () => clearTimeout(timer);
+    checkTelegram();
   }, []);
 
   // 2. ЗАКРЫТИЕ СДЕЛОК
