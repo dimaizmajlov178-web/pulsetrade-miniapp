@@ -36,10 +36,7 @@ export default function Home() {
       }
     }
 
-    // Временное окно для проверки
-    setTimeout(() => {
-      alert("Ваш Telegram ID: " + currentId);
-    }, 1000);
+  
 
     fetch(`/api/user/balance?telegramId=${currentId}`)
       .then((res) => res.json())
