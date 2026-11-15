@@ -17,14 +17,13 @@ export default function Home() {
   const [selectedAsset, setSelectedAsset] = useState("BTC/USDT");
   const [showAssets, setShowAssets] = useState(false);
   const [showBalanceMenu, setShowBalanceMenu] = useState(false);
-  const [showProfile, setShowProfile] = useState(false); // Состояние для профиля
-  const [userUid, setUserUid] = useState<number | null>(null); // Состояние для UID
+  const [showProfile, setShowProfile] = useState(false);
+  const [userUid, setUserUid] = useState<number | null>(null);
   const [chartInstance, setChartInstance] = useState<any>(null);
   const [seriesInstance, setSeriesInstance] = useState<any>(null);
-  
   const [telegramId, setTelegramId] = useState<number>(123456789);
 
-  // 1. ПОЛУЧАЕМ ID, БАЛАНС И UID
+  // 1. ПОЛУЧАЕМ ID И UID
   useEffect(() => {
     let currentId = 123456789;
     if (typeof window !== "undefined" && (window as any).Telegram?.WebApp) {
@@ -40,22 +39,17 @@ export default function Home() {
     fetch(`/api/user/balance?telegramId=${currentId}`)
       .then((res) => res.json())
       .then((data) => {
-        if (data.balance !== undefined) {
-          setBalance(data.balance);
-        }
-        if (data.uid !== undefined) {
-          setUserUid(data.uid);
-        }
+        if (data.balance !== undefined) setBalance(data.balance);
+        if (data.uid !== undefined) setUserUid(data.uid);
       })
       .catch(console.error);
   }, []);
 
-  // 2. БУДИЛЬНИК ДЛЯ ЗАКРЫТИЯ СДЕЛОК
+  // 2. ЗАКРЫТИЕ СДЕЛОК
   useEffect(() => {
     const interval = setInterval(() => {
       fetch("/api/cron").catch(console.error);
     }, 5000);
-
     return () => clearInterval(interval);
   }, []);
 
@@ -112,7 +106,6 @@ export default function Home() {
 
   useEffect(() => {
     if (!seriesInstance) return;
-
     const symbol = getSymbol();
 
     fetch(`/api/market?symbol=${symbol}&interval=${timeframe}`)
@@ -122,7 +115,6 @@ export default function Home() {
           seriesInstance.setData(data.candles);
           const lastCandle = data.candles[data.candles.length - 1];
           setPrice(lastCandle.close);
-          
           if (chartInstance) {
             chartInstance.timeScale().setVisibleLogicalRange({
               from: data.candles.length - 100,
@@ -156,7 +148,6 @@ export default function Home() {
       alert("Недостаточно средств");
       return;
     }
-
     try {
       const res = await fetch("/api/trades", {
         method: "POST",
@@ -168,10 +159,8 @@ export default function Home() {
           telegramId: telegramId,
         }),
       });
-
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-
       setBalance(data.balance);
     } catch (error: any) {
       alert(error.message);
@@ -180,14 +169,22 @@ export default function Home() {
 
   return (
     <div className="h-screen flex flex-col bg-[#0B0E11] overflow-hidden relative">
+      {/* УПРОЩЕННЫЙ ПРОФИЛЬ */}
+      {showProfile && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.9)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ backgroundColor: '#151A21', padding: '20px', borderRadius: '16px', width: '80%', maxWidth: '300px', textAlign: 'center', border: '1px solid #1f2630' }}>
+            <h2 style={{ color: 'white', marginBottom: '10px' }}>Ваш Профиль</h2>
+            <p style={{ color: '#00C076', fontSize: '24px', fontWeight: 'bold' }}>{userUid || "Загрузка..."}</p>
+            <p style={{ color: 'gray', fontSize: '12px', marginTop: '5px' }}>Баланс: ${balance}</p>
+            <button onClick={() => setShowProfile(false)} style={{ marginTop: '20px', backgroundColor: '#FF4D4D', color: 'white', padding: '10px 20px', borderRadius: '8px', border: 'none', width: '100%' }}>Закрыть</button>
+          </div>
+        </div>
+      )}
+
       {/* ВЕРХНЯЯ ПАНЕЛЬ */}
       <header className="flex justify-between items-center px-4 py-3 bg-[#0B0E11] shrink-0 relative z-30">
         <div className="flex items-center gap-3">
-          {/* КЛИКАБЕЛЬНАЯ АВАТАРКА */}
-          <button 
-            onClick={() => setShowProfile(true)}
-            className="w-10 h-10 bg-[#00C076] rounded-full flex items-center justify-center font-bold text-white text-lg shadow-[0_0_10px_rgba(0,192,118,0.3)] hover:opacity-90 transition"
-          >
+          <button onClick={() => { console.log("Клик по аватарке!"); setShowProfile(true); }} className="w-10 h-10 bg-[#00C076] rounded-full flex items-center justify-center font-bold text-white text-lg shadow-[0_0_10px_rgba(0,192,118,0.3)]">
             P
           </button>
           <div className="flex flex-col">
@@ -201,163 +198,64 @@ export default function Home() {
         </div>
         
         <div className="flex items-center gap-3 relative">
-          <button 
-            onClick={() => setShowBalanceMenu(!showBalanceMenu)}
-            className="bg-[#151A21] px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold text-[#00C076] hover:bg-[#1f2630] transition-colors"
-          >
-            <Wallet size={16} />
-            ${balance}
+          <button onClick={() => setShowBalanceMenu(!showBalanceMenu)} className="bg-[#151A21] px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold text-[#00C076]">
+            <Wallet size={16} /> ${balance}
           </button>
-
           {showBalanceMenu && (
             <div className="absolute top-[50px] right-[40px] w-48 bg-[#151A21] rounded-xl shadow-2xl border border-[#1f2630] overflow-hidden z-50 flex flex-col">
-               <button className="flex items-center gap-3 px-4 py-3 text-sm font-bold text-white hover:bg-[#1f2630] transition-colors" onClick={() => setShowBalanceMenu(false)}>
-                  <PlusCircle size={16} className="text-[#00C076]" />
-                  Пополнить
-               </button>
+               <button className="flex items-center gap-3 px-4 py-3 text-sm font-bold text-white hover:bg-[#1f2630]"><PlusCircle size={16} className="text-[#00C076]" /> Пополнить</button>
                <div className="h-[1px] bg-[#1f2630] w-full"></div>
-               <button className="flex items-center gap-3 px-4 py-3 text-sm font-bold text-white hover:bg-[#1f2630] transition-colors" onClick={() => setShowBalanceMenu(false)}>
-                  <ArrowUpRight size={16} className="text-[#FF4D4D]" />
-                  Вывести
-               </button>
+               <button className="flex items-center gap-3 px-4 py-3 text-sm font-bold text-white hover:bg-[#1f2630]"><ArrowUpRight size={16} className="text-[#FF4D4D]" /> Вывести</button>
             </div>
           )}
           <button className="text-white"><Menu size={24} /></button>
         </div>
       </header>
 
-      {/* МОДАЛЬНОЕ ОКНО ПРОФИЛЯ */}
-      {showProfile && (
-        <div className="absolute inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-[#151A21] w-full max-w-sm rounded-2xl p-6 relative border border-[#1f2630]">
-            <button 
-              onClick={() => setShowProfile(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-white"
-            >
-              <X size={20} />
-            </button>
-            <div className="flex flex-col items-center">
-              <div className="w-20 h-20 bg-[#00C076] rounded-full flex items-center justify-center font-bold text-white text-3xl mb-4 shadow-[0_0_20px_rgba(0,192,118,0.4)]">
-                P
-              </div>
-              <h2 className="text-xl font-bold text-white mb-1">Ваш Профиль</h2>
-              <div className="bg-[#0B0E11] w-full rounded-xl p-4 mt-4 flex flex-col gap-3 border border-[#1f2630]">
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-400">Ваш UID:</span>
-                  <span className="text-[#00C076] font-mono font-bold text-lg">{userUid || "Загрузка..."}</span>
-                </div>
-                <div className="flex justify-between items-center text-sm">
-                  <span className="text-gray-400">Текущий баланс:</span>
-                  <span className="text-white font-bold">${balance}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ИНФО О ПАРЕ И ТАЙМФРЕЙМЫ */}
+      {/* ОСТАЛЬНОЙ ИНТЕРФЕЙС (ГРАФИК И КНОПКИ) */}
       <div className="flex flex-col px-4 py-1 shrink-0 relative z-20">
         <div className="flex justify-between items-center text-xs mb-2">
-          <div className="flex items-center gap-2 font-bold cursor-pointer hover:bg-[#151A21] px-2 py-1 rounded-lg transition-colors -ml-2" onClick={() => setShowAssets(!showAssets)}>
+          <div className="flex items-center gap-2 font-bold cursor-pointer" onClick={() => setShowAssets(!showAssets)}>
             <span className="text-base text-white">{selectedAsset}</span>
-            <ChevronDown size={16} className={`text-gray-400 transition-transform ${showAssets ? 'rotate-180' : ''}`} />
+            <ChevronDown size={16} className="text-gray-400" />
             <span className="text-[#00C076] ml-2">82%</span>
           </div>
           <Settings size={16} className="text-gray-500" />
         </div>
-        
         <div className="flex gap-4 overflow-x-auto text-xs font-bold pb-1">
           {TIMEFRAMES.map((tf) => (
-            <button key={tf} onClick={() => setTimeframe(tf)} className={`transition-colors ${timeframe === tf ? "text-[#00C076]" : "text-gray-500 hover:text-gray-300"}`}>
-              {tf}
-            </button>
+            <button key={tf} onClick={() => setTimeframe(tf)} className={`transition-colors ${timeframe === tf ? "text-[#00C076]" : "text-gray-500"}`}>{tf}</button>
           ))}
         </div>
       </div>
 
-      {/* ВЫПАДАЮЩИЙ СПИСОК АКТИВОВ */}
-      {showAssets && (
-        <div className="absolute top-[110px] left-4 w-64 bg-[#151A21] rounded-xl shadow-2xl z-50 border border-[#1f2630] overflow-hidden">
-           <div className="p-2 border-b border-[#1f2630] flex items-center gap-2 text-gray-400">
-              <Search size={14} />
-              <input type="text" placeholder="Поиск..." className="bg-transparent text-sm outline-none w-full text-white" />
-           </div>
-           <div className="max-h-60 overflow-y-auto">
-              {ASSETS.map((asset) => (
-                <div key={asset} onClick={() => { setSelectedAsset(asset); setShowAssets(false); }} className={`px-4 py-3 text-sm font-bold cursor-pointer hover:bg-[#1f2630] transition-colors ${selectedAsset === asset ? "text-[#00C076]" : "text-white"}`}>
-                  {asset}
-                </div>
-              ))}
-           </div>
-        </div>
-      )}
-
-      {/* ТЕКУЩАЯ ЦЕНА И ГРАФИК */}
       <div className="flex-1 relative min-h-[300px]">
-        <div className="absolute top-2 left-4 z-10">
-            <span className="text-3xl font-bold text-white">${price}</span>
-        </div>
+        <div className="absolute top-2 left-4 z-10"><span className="text-3xl font-bold text-white">${price}</span></div>
         <div className="w-full h-full" ref={chartContainerRef} />
       </div>
 
-      {/* ПАНЕЛЬ СТАВКИ */}
       <div className="p-3 bg-[#0B0E11] shrink-0 relative z-20">
         <div className="grid grid-cols-3 gap-2 mb-3 items-stretch">
-           <div className="bg-[#151A21] rounded-xl flex flex-col items-center justify-center h-[80px]">
-              <Clock size={16} className="text-gray-400 mb-1" />
-              <div className="flex items-center gap-1">
-                 <span className="font-bold text-sm text-white">{expiry}</span>
-                 <ChevronDown size={12} className="text-gray-400" />
-              </div>
-           </div>
-
+           <div className="bg-[#151A21] rounded-xl flex flex-col items-center justify-center h-[80px]"><Clock size={16} className="text-gray-400 mb-1" /><span className="font-bold text-sm text-white">{expiry}</span></div>
            <div className="flex flex-col justify-between h-[80px]">
-              <div className="bg-[#151A21] rounded-lg flex items-center justify-center h-10 gap-2">
-                 <span className="font-bold text-sm text-white">${amount}</span>
-                 <ChevronDown size={12} className="text-gray-400" />
-              </div>
+              <div className="bg-[#151A21] rounded-lg flex items-center justify-center h-10 gap-2"><span className="font-bold text-sm text-white">${amount}</span></div>
               <div className="flex gap-1 h-8 mt-1">
-                 <button onClick={() => setAmount(Math.max(1, Math.floor(amount / 2)))} className="flex-1 bg-[#151A21] rounded-lg flex justify-center items-center text-white text-xs font-bold hover:bg-[#1f2630] transition">/2</button>
-                 <button onClick={() => setAmount(amount * 2)} className="flex-1 bg-[#151A21] rounded-lg flex justify-center items-center text-white text-xs font-bold hover:bg-[#1f2630] transition">x2</button>
+                 <button onClick={() => setAmount(Math.max(1, Math.floor(amount / 2)))} className="flex-1 bg-[#151A21] rounded-lg text-white text-xs font-bold">/2</button>
+                 <button onClick={() => setAmount(amount * 2)} className="flex-1 bg-[#151A21] rounded-lg text-white text-xs font-bold">x2</button>
               </div>
            </div>
-
-           <div className="bg-[#151A21] rounded-xl flex flex-col items-center justify-center h-[80px]">
-              <span className="text-[10px] text-gray-400">Доходность</span>
-              <span className="text-xl text-[#00C076] font-bold leading-none mt-1">82%</span>
-              <span className="text-[10px] text-[#00C076] font-bold leading-none mt-1">
-                 +${(amount * 0.82).toFixed(2)}
-              </span>
-           </div>
+           <div className="bg-[#151A21] rounded-xl flex flex-col items-center justify-center h-[80px]"><span className="text-[10px] text-gray-400">Доходность</span><span className="text-xl text-[#00C076] font-bold leading-none mt-1">82%</span></div>
         </div>
-
         <div className="grid grid-cols-2 gap-3 h-20">
-          <button onClick={() => handleTrade("up")} className="bg-[#00C076] rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(0,192,118,0.3)]">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
-          </button>
-          <button onClick={() => handleTrade("down")} className="bg-[#FF4D4D] rounded-xl flex items-center justify-center shadow-[0_0_15px_rgba(255,77,77,0.3)]">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
-          </button>
+          <button onClick={() => handleTrade("up")} className="bg-[#00C076] rounded-xl flex items-center justify-center"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+          <button onClick={() => handleTrade("down")} className="bg-[#FF4D4D] rounded-xl flex items-center justify-center"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><path d="M12 5v14M19 12l-7 7-7-7"/></svg></button>
         </div>
       </div>
 
-      {/* НИЖНЕЕ МЕНЮ */}
       <div className="flex justify-around items-center py-2 border-t border-[#151A21] bg-[#0B0E11] shrink-0">
-         <button className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-white transition">
-            <Menu size={18} />
-            <span className="text-[9px]">Меню</span>
-         </button>
-         
-         <button className="flex flex-col items-center gap-0.5 text-[#00C076] hover:text-[#00a060] transition">
-            <CandlestickChart size={20} />
-            <span className="text-[9px]">Торговля</span>
-         </button>
-         
-         <button className="flex flex-col items-center gap-0.5 text-gray-400 hover:text-white transition">
-            <Wallet size={18} />
-            <span className="text-[9px]">Кошелек</span>
-         </button>
+         <button className="flex flex-col items-center gap-0.5 text-gray-400"><Menu size={18} /><span className="text-[9px]">Меню</span></button>
+         <button className="flex flex-col items-center gap-0.5 text-[#00C076]"><CandlestickChart size={20} /><span className="text-[9px]">Торговля</span></button>
+         <button className="flex flex-col items-center gap-0.5 text-gray-400"><Wallet size={18} /><span className="text-[9px]">Кошелек</span></button>
       </div>
     </div>
   );
